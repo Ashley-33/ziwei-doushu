@@ -280,7 +280,7 @@ cd ziwei-doushu
 # 安装依赖
 npm install
 
-# 配置环境变量（只看排盘可以跳过；AI 配置仅在你自己实现了 /api/* 接口时才用得上）
+# 配置环境变量（只用排盘可以跳过；要 AI 解读就需要填 key）
 cp .env.example .env.local
 
 # 启动开发服务器
@@ -296,7 +296,18 @@ npm test            # 排盘引擎回归（768 盘 × 紫微铁律、夏令时�
 
 每次 push 与 PR 都会在 GitHub Actions 上跑同一套（见 [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)）。
 
-> **注意：开源版不含后端 API 路由。**排盘、命盘展示、合盘起盘都在浏览器里用本仓库的引擎完成，**不需要任何 API Key**。AI 解读（`/api/interpret`）和合盘 AI 分析（`/api/heming`）需要你自己实现接口；没实现之前，这两处会直接提示「开源版不含该接口」，配置 API Key 也不会变成可用（#30 就是这个原因）。
+> **注意：排盘不需要 Key，AI 解读需要。**排盘、命盘展示、合盘起盘都在浏览器里用本仓库的引擎完成，**不需要任何 API Key**。
+>
+> 本仓库（fork）已补上两个 AI 接口，走 OpenAI 兼容协议，任选一家填 key 即可用：
+> - `POST /api/interpret` — 命盘解读，请求 `{ chart, messages }`，SSE 流式返回
+> - `POST /api/heming` — 双人合盘分析，请求 `{ chartA, chartB, question? }`，SSE 流式返回
+>
+> 配置方式：`.env.local` 里填 `AI_PROVIDER`（deepseek / moonshot / zhipu / zai / siliconflow / dashscope / openrouter / openai / custom / mimo）与对应的 `*_API_KEY`，需要换模型或走中转站时再给 `AI_BASE_URL` / `AI_MODEL`。
+>
+> **没配 key 也能用。** 这时接口不报错，而是返回一段已经组装好的完整提示词（命盘事实 + 解盘规则 + 古籍原文，约 2.5k 字），前端显示「复制完整提示词」按钮 —— 复制后粘到任意 AI 窗口（WorkBuddy / Claude / ChatGPT）就能得到同等质量的解读。原因是解盘的难点在「把盘算准」和「把规矩讲清」，这两步全在本仓库完成，模型只负责措辞。
+>
+> 命盘事实（星曜、亮度、四化、大限、格局、古籍原文）由本仓库引擎生成，模型只负责表达，代码见 `lib/ai/`；提示词导出见 `lib/ai/export-prompt.ts`，复制按钮见 `components/CopyPrompt.tsx`。
+
 
 ---
 

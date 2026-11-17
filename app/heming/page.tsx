@@ -6,6 +6,7 @@ import { formToBirthInfo } from '@/lib/ziwei/share';
 import { generateChart as buildChart } from '@/lib/ziwei/algorithm';
 import type { BirthInfo, ZiweiChart } from '@/lib/ziwei/types';
 import { useTheme } from '@/components/ThemeProvider';
+import CopyPrompt, { promptOnlyMessage } from '@/components/CopyPrompt';
 
 // ─── AiContent 渲染器（与 InsightPanel 一致）────────────────
 function AiContent({ text, streaming }: { text: string; streaming?: boolean }) {
@@ -64,8 +65,11 @@ export default function HemingPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [question, setQuestion] = useState('');
   const [analysisError, setAnalysisError] = useState(false);
-  // 开源版不含 /api/heming：接口 404 时单独说明，而不是让用户反复重试
+  // 服务端返回的具体原因（没配 Key、模型报错等），直接展示给用户
+  const [analysisErrorMsg, setAnalysisErrorMsg] = useState<string | null>(null);
+  // /api/heming 未配置模型 key 时会返回组装好的提示词，这里存下来供一键复制
   const [apiMissing, setApiMissing] = useState(false);
+  const [promptExport, setPromptExport] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const analysisRef = useRef<HTMLDivElement>(null);
 
@@ -93,6 +97,8 @@ export default function HemingPage() {
     setAnalyzing(true);
     setAnalysis('');
     setAnalysisError(false);
+    setAnalysisErrorMsg(null);
+    setPromptExport(null);
 
     try {
       // 每次按当前表单起盘，避免编辑出生信息后复用旧盘。
@@ -114,7 +120,25 @@ export default function HemingPage() {
         body: JSON.stringify({ chartA: cA, chartB: cB, question: q ?? undefined }),
       });
       if (res.status === 404) { setApiMissing(true); throw new Error('api-missing'); }
-      if (!res.ok || !res.body) throw new Error();
+      if (!res.ok) {
+        const detail = (await res.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(detail?.message || '分析请求失败');
+      }
+      // 没配模型时不返回流，而是返回组装好的完整提示词，前端一键复制
+      const contentType = res.headers.get('content-type') ?? '';
+      if (contentType.includes('application/json')) {
+        const payload = (await res.json().catch(() => null)) as
+          | { mode?: string; reason?: string; prompt?: string }
+          | null;
+        if (payload?.mode === 'prompt-only' && payload.prompt) {
+          setPromptExport(payload.prompt);
+          setAnalysis(promptOnlyMessage(payload.reason));
+          setTimeout(() => analysisRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+          return;
+        }
+        throw new Error('分析请求失败');
+      }
+      if (!res.body) throw new Error('无响应流');
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -132,17 +156,22 @@ export default function HemingPage() {
           if (!line.startsWith('data: ')) continue;
           const data = line.slice(6);
           if (data === '[DONE]') break;
+          let parsed: { delta?: { text?: string }; error?: string } | null = null;
           try {
-            const delta = JSON.parse(data).delta?.text ?? '';
-            text += delta;
-            setAnalysis(text);
-          } catch { /* skip */ }
+            parsed = JSON.parse(data) as { delta?: { text?: string }; error?: string };
+          } catch { continue; }
+          if (parsed?.error) throw new Error(parsed.error);
+          text += parsed?.delta?.text ?? '';
+          setAnalysis(text);
         }
       }
       // scroll to analysis
       setTimeout(() => analysisRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-    } catch {
+    } catch (e) {
       setAnalysisError(true);
+      if (!(e instanceof Error && e.message === 'api-missing')) {
+        setAnalysisErrorMsg(e instanceof Error && e.message ? e.message : null);
+      }
     } finally {
       setAnalyzing(false);
     }
@@ -281,12 +310,17 @@ export default function HemingPage() {
           )}
 
           {analysis && <AiContent text={analysis} streaming={analyzing} />}
+          {promptExport && (
+            <div style={{ marginTop: '10px' }}>
+              <CopyPrompt text={promptExport} />
+            </div>
+          )}
 
           {analysisError && (
             <div style={{ padding: '12px 16px', borderRadius: '10px', border: '1px solid var(--bdr)', background: 'var(--bg-card)', fontSize: '13px', color: 'var(--tx-2)', marginTop: '12px' }}>
               {apiMissing
-                ? '开源版不含合盘 AI 分析接口（/api/heming），需要你自己实现后才能用。两人的命盘可以分别到「排盘」页（/chart）查看。'
-                : '分析暂时不可用，请重试。'}
+                ? 'AI 合盘接口未启用。请在 .env.local 里配置 AI_PROVIDER 与对应的 API Key 后重启服务。'
+                : analysisErrorMsg ?? '分析暂时不可用，请重试。'}
             </div>
           )}
         </div>

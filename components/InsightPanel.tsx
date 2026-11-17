@@ -3,11 +3,13 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ZiweiChart, Palace } from '@/lib/ziwei/types';
 import type { TimeView } from './TimeNav';
+import CopyPrompt, { promptOnlyMessage } from './CopyPrompt';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   hidden?: boolean; // don't show user bubble for auto/topic messages
+  copyText?: string; // 未配置模型时导出的完整提示词，附一键复制
 }
 
 interface SelectedSiHua {
@@ -282,37 +284,70 @@ ${selectedSiHua.starName}化${selectedSiHua.siHua}落在【${palaceName}】，�
         body: JSON.stringify({ chart, messages: apiMessages }),
       });
       if (res.status === 404) throw new Error('api-missing');
-      if (!res.ok) throw new Error('请求失败');
+      if (!res.ok) {
+        // 服务端已经把「没配 Key」「模型报错」等原因写在 message 里，直接透出给用户
+        const detail = await res.json().catch(() => null) as { message?: string } | null;
+        throw new Error(detail?.message || '请求失败');
+      }
+      // 没配模型时服务端不返回流，而是返回组装好的完整提示词
+      const contentType = res.headers.get('content-type') ?? '';
+      if (contentType.includes('application/json')) {
+        const payload = await res.json().catch(() => null) as
+          | { mode?: string; reason?: string; prompt?: string }
+          | null;
+        if (payload?.mode === 'prompt-only' && payload.prompt) {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: promptOnlyMessage(payload.reason),
+            copyText: payload.prompt,
+          }]);
+          return;
+        }
+        throw new Error('请求失败');
+      }
       if (!res.body) throw new Error('无响应流');
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let assistantText = '';
+      let pendingLine = '';
 
       setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        for (const line of chunk.split('\n')) {
+        // 网络可能把一帧切成两半，残行留到下一轮，否则这段文字会被整段丢掉
+        pendingLine += decoder.decode(value, { stream: true });
+        const lines = pendingLine.split('\n');
+        pendingLine = lines.pop() ?? '';
+        for (const rawLine of lines) {
+          const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
           if (!line.startsWith('data: ')) continue;
           const data = line.slice(6);
           if (data === '[DONE]') break;
+          let parsed: { delta?: { text?: string }; error?: string } | null = null;
           try {
-            const delta = JSON.parse(data).delta?.text ?? '';
-            assistantText += delta;
-            setMessages(prev => {
-              const updated = [...prev];
-              updated[updated.length - 1] = { role: 'assistant', content: assistantText };
-              return updated;
-            });
-          } catch { /* skip */ }
+            parsed = JSON.parse(data) as { delta?: { text?: string }; error?: string };
+          } catch {
+            continue;
+          }
+          if (parsed?.error) throw new Error(parsed.error);
+          const delta = parsed?.delta?.text ?? '';
+          assistantText += delta;
+          setMessages(prev => {
+            const updated = [...prev];
+            updated[updated.length - 1] = { role: 'assistant', content: assistantText };
+            return updated;
+          });
         }
       }
     } catch (e) {
       const missing = e instanceof Error && e.message === 'api-missing';
-      setMessages(prev => [...prev, { role: 'assistant', content: missing ? '开源版不含 AI 解读接口（/api/interpret），需要你自己实现后才能用，详见 README「快速开始」。排盘本身不需要任何 API Key。' : '解读失败，请稍后重试。' }]);
+      const message = missing
+        ? 'AI 解读接口未启用。请在 .env.local 里配置 AI_PROVIDER 与对应的 API Key 后重启服务。'
+        : (e instanceof Error && e.message) || '解读失败，请稍后重试。';
+      setMessages(prev => [...prev, { role: 'assistant', content: message }]);
     } finally {
       setLoading(false);
       loadingRef.current = false;
@@ -426,6 +461,7 @@ ${selectedSiHua.starName}化${selectedSiHua.siHua}落在【${palaceName}】，�
                   命理解读
                 </div>
                 <AiContent text={msg.content} streaming={loading && isLastMsg} />
+                {msg.copyText && <CopyPrompt text={msg.copyText} />}
               </motion.div>
             );
           })}
