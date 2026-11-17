@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import SkyBackdrop from '@/components/SkyBackdrop';
+import BottomNav from '@/components/BottomNav';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { SITE_URL } from '@/lib/site';
@@ -42,9 +44,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('ziwei-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);else document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();` }} />
       </head>
-      <body className="min-h-screen">
+      <body className="min-h-screen has-bottom-nav">
         <ThemeProvider>
-          {children}
+          <SkyBackdrop />
+          <div className="relative z-10">{children}</div>
+          <BottomNav />
         </ThemeProvider>
         <Analytics />
         <SpeedInsights />

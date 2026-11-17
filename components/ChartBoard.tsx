@@ -104,24 +104,25 @@ export default function ChartBoard({ chart, onStarSelect, onPalaceSelect, onSiHu
         animate={{ opacity: 1, y: 0 }}
         className="text-center mb-3"
       >
-        <div className="text-[10px] tracking-[0.5em] uppercase mb-1" style={{ color: 'var(--t-faint)' }}>
+        <div className="text-[9px] tracking-[0.5em] uppercase mb-1" style={{ color: 'var(--tx-3)' }}>
           Zi Wei Dou Shu
         </div>
-        <h2 className="text-sm tracking-[0.25em] font-medium" style={{ color: 'var(--t-gold)' }}>
+        <h2 className="text-[13px] tracking-[0.22em] font-medium"
+          style={{ color: 'var(--ac)', fontFamily: "'Songti SC','Noto Serif SC',serif" }}>
           {chart.birthInfo.name ? `${chart.birthInfo.name} · ` : ''}紫微斗数命盘
         </h2>
       </motion.div>
 
       {/* 4x4 命盘网格（含 SVG 叠加层） */}
       <div
-        className="grid rounded-xl overflow-hidden relative"
+        className="grid rounded-[20px] overflow-hidden relative"
         style={{
           gridTemplateColumns: 'repeat(4, 1fr)',
           gridTemplateRows: 'repeat(4, auto)',
           gap: '1px',
-          background: 'var(--t-border)',
-          border: '1px solid var(--t-border)',
-          boxShadow: '0 4px 32px rgba(0,0,0,0.15)',
+          background: 'rgba(232,205,147,0.18)',
+          border: '1px solid rgba(232,205,147,0.30)',
+          boxShadow: '0 14px 36px rgba(50,36,104,0.26), inset 0 1px 0 rgba(255,255,255,0.10)',
         }}
       >
         {ANIMATION_ORDER.map((branch, i) => {
@@ -129,7 +130,7 @@ export default function ChartBoard({ chart, onStarSelect, onPalaceSelect, onSiHu
           const palace = palaceMap[branch];
           if (!palace) return null;
           return (
-            <div key={branch} style={{ gridRow: row, gridColumn: col, background: 'var(--t-bg)' }}>
+            <div key={branch} style={{ gridRow: row, gridColumn: col, background: 'var(--t-bg2)' }}>
               <PalaceCell
                 palace={palace}
                 onClick={() => handlePalaceClick(branch)}
@@ -150,35 +151,41 @@ export default function ChartBoard({ chart, onStarSelect, onPalaceSelect, onSiHu
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.5 }}
-          className="flex flex-col items-center justify-center p-4 gap-3"
-          style={{ gridRow: '2 / 4', gridColumn: '2 / 4', background: 'var(--t-bg)' }}
+          className="flex flex-col items-center justify-center p-3 gap-2.5"
+          style={{
+            gridRow: '2 / 4', gridColumn: '2 / 4',
+            background: 'radial-gradient(ellipse at 50% 35%, rgba(146,116,224,0.34) 0%, rgba(80,69,140,0.94) 72%)',
+          }}
         >
-          <div className="text-5xl select-none leading-none" style={{ color: 'var(--t-gold)', opacity: 0.12, filter: 'drop-shadow(0 0 12px rgba(180,120,30,0.15))' }}>
+          <div className="text-4xl select-none leading-none"
+            style={{ color: 'var(--ac)', opacity: 0.35, filter: 'drop-shadow(0 0 14px rgba(232,205,147,0.35))' }}>
             ☯
           </div>
 
           <div className="text-center space-y-1">
-            <div className="text-[9px] tracking-[0.3em] font-medium" style={{ color: 'var(--t-gold)' }}>紫微斗数</div>
-            <div className="text-[10px] space-y-0.5" style={{ color: 'var(--t-faint)' }}>
-              <div>命宫 <span style={{ color: 'var(--t-gold)', opacity: 0.7 }}>{BRANCHES[chart.mingGongBranch]}</span></div>
-              <div>身宫 <span className="text-sky-500/70">{BRANCHES[chart.shenGongBranch]}</span></div>
-              <div className="text-[9px]" style={{ color: 'var(--t-gold)', opacity: 0.75 }}>{chart.wuxingJuName}</div>
+            <div className="text-[9px] tracking-[0.3em] font-medium"
+              style={{ color: 'var(--ac)', fontFamily: "'Songti SC','Noto Serif SC',serif" }}>紫微斗数</div>
+            <div className="text-[10px] space-y-0.5" style={{ color: 'var(--tx-3)' }}>
+              <div>命宫 <span style={{ color: 'var(--ac)' }}>{BRANCHES[chart.mingGongBranch]}</span></div>
+              <div>身宫 <span style={{ color: '#9CC4F5' }}>{BRANCHES[chart.shenGongBranch]}</span></div>
+              <div className="text-[9px]" style={{ color: 'var(--ac)', opacity: 0.8 }}>{chart.wuxingJuName}</div>
             </div>
           </div>
 
           {chart.currentDaXianIndex >= 0 && (() => {
             const dx = chart.daXians[chart.currentDaXianIndex];
             return (
-              <div className="border border-purple-500/30 rounded-lg px-3 py-1.5 text-center"
-                style={{ background: 'rgba(147,51,234,0.06)' }}>
-                <div className="text-[8px] text-purple-500/80 mb-0.5 tracking-wider">当前大限</div>
-                <div className="text-[12px] text-purple-400 font-medium tabular-nums">{dx.startAge}–{dx.endAge}岁</div>
-                <div className="text-[9px] text-purple-500/60">{dx.palaceName}</div>
+              <div className="rounded-xl px-3 py-1.5 text-center"
+                style={{ background: 'rgba(124,90,203,0.22)', border: '1px solid rgba(169,140,232,0.35)' }}>
+                <div className="text-[8px] mb-0.5 tracking-wider" style={{ color: '#C6AEF5' }}>当前大限</div>
+                <div className="text-[12px] font-medium tabular-nums" style={{ color: '#E4D8FF' }}>{dx.startAge}–{dx.endAge}岁</div>
+                <div className="text-[9px]" style={{ color: 'rgba(198,174,245,0.75)' }}>{dx.palaceName}</div>
               </div>
             );
           })()}
 
-          <div className="text-[8px] text-center leading-relaxed font-mono" style={{ color: 'var(--t-faint)', opacity: 0.75 }}>
+          <div className="text-[8px] text-center leading-relaxed font-mono"
+            style={{ color: 'var(--tx-3)', opacity: 0.8 }}>
             {chart.lunarInfo.lunarYear}·{chart.lunarInfo.isLeapMonth ? '闰' : ''}
             {chart.lunarInfo.lunarMonth}·{chart.lunarInfo.lunarDay}
           </div>
@@ -213,7 +220,7 @@ export default function ChartBoard({ chart, onStarSelect, onPalaceSelect, onSiHu
                   const p2 = BRANCH_SVG_POS[sanFangBranches[2]]; // 三合1
                   const p3 = BRANCH_SVG_POS[sanFangBranches[3]]; // 三合2
                   const dash = "6,5";
-                  const stroke = "rgba(37,99,235,0.55)";
+                  const stroke = "rgba(232,205,147,0.62)";
                   const sw = "1.5";
                   return (
                     <>
@@ -249,7 +256,7 @@ export default function ChartBoard({ chart, onStarSelect, onPalaceSelect, onSiHu
                           key={i}
                           cx={`${p[0]}%`} cy={`${p[1]}%`}
                           r="3"
-                          fill={i === 0 ? 'rgba(37,99,235,0.8)' : 'rgba(37,99,235,0.45)'}
+                          fill={i === 0 ? 'rgba(255,240,206,0.95)' : 'rgba(232,205,147,0.55)'}
                         />
                       ))}
                     </>
@@ -269,14 +276,14 @@ export default function ChartBoard({ chart, onStarSelect, onPalaceSelect, onSiHu
         className="mt-3 flex items-center justify-center gap-2 text-[9px] flex-wrap"
       >
         {[
-          { h: '化禄', c: 'text-emerald-500 border-emerald-500/30' },
-          { h: '化权', c: 'text-blue-500 border-blue-500/30' },
-          { h: '化科', c: 'text-yellow-500 border-yellow-500/30' },
-          { h: '化忌', c: 'text-red-500 border-red-500/30' },
+          { h: '化禄', c: 'text-emerald-300 border-emerald-400/35' },
+          { h: '化权', c: 'text-sky-300 border-sky-400/35' },
+          { h: '化科', c: 'text-amber-200 border-amber-300/35' },
+          { h: '化忌', c: 'text-rose-300 border-rose-400/35' },
         ].map(({ h, c }) => (
           <span key={h} className={`border px-1.5 py-0.5 rounded-full font-medium ${c}`}>{h}</span>
         ))}
-        <span className="px-1.5 py-0.5 rounded-full" style={{ color: 'var(--t-faint)', border: '1px solid var(--t-border)' }}>
+        <span className="px-1.5 py-0.5 rounded-full" style={{ color: 'var(--tx-3)', border: '1px solid var(--bdr-med)' }}>
           点击宫位看三方四正
         </span>
       </motion.div>

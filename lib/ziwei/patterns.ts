@@ -15,7 +15,8 @@
  *  - 倪师《天纪》紫微斗数讲义
  */
 
-import 'server-only';
+// 纯函数模块：只依赖 types，不触碰任何 Node API，
+// 因此客户端组件（命盘总览 / 格局识别）可直接复用同一套判定逻辑。
 import type { ZiweiChart, Palace, Star, SiHua } from './types';
 
 // ────────────────── 类型 ──────────────────

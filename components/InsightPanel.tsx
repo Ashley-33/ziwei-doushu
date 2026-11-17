@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { ZiweiChart, Palace } from '@/lib/ziwei/types';
 import type { TimeView } from './TimeNav';
 import CopyPrompt, { promptOnlyMessage } from './CopyPrompt';
+import AiContent from './AiContent';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -146,44 +147,6 @@ const PALACE_ROLES: Record<string, string> = {
   '父母宫': '父母关系、文书契约',
 };
 
-/** Render AI markdown: **【Title】** → gold header, **bold** → strong */
-function AiContent({ text, streaming }: { text: string; streaming?: boolean }) {
-  const lines = text.split('\n');
-  return (
-    <div className="space-y-0.5">
-      {lines.map((line, i) => {
-        const sectionMatch = line.match(/^\*\*【(.+?)】\*\*$/);
-        if (sectionMatch) {
-          return (
-            <div key={i} className="pt-3 pb-0.5 first:pt-0">
-              <span className="text-[11px] font-semibold tracking-wide" style={{ color: 'var(--t-gold)' }}>
-                【{sectionMatch[1]}】
-              </span>
-            </div>
-          );
-        }
-        if (line.trim() === '') return <div key={i} className="h-1" />;
-        const parts = line.split(/\*\*(.+?)\*\*/);
-        return (
-          <div key={i} className="text-[11px] leading-relaxed" style={{ color: 'var(--t-text2)' }}>
-            {parts.map((part, j) =>
-              j % 2 === 0
-                ? part
-                : <strong key={j} className="font-medium" style={{ color: 'var(--t-text)' }}>{part}</strong>
-            )}
-          </div>
-        );
-      })}
-      {streaming && (
-        <span
-          className="inline-block w-1.5 h-3 ml-0.5 animate-pulse rounded-sm align-middle"
-          style={{ background: 'var(--t-gold)', opacity: 0.6 }}
-        />
-      )}
-    </div>
-  );
-}
-
 export default function InsightPanel({ chart, selectedPalace, selectedSiHua }: InsightPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -195,17 +158,93 @@ export default function InsightPanel({ chart, selectedPalace, selectedSiHua }: I
   const lastPalaceBranch = useRef<number | undefined>(undefined);
   const lastSiHuaKey = useRef<string | undefined>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  // 手机上输入条只在「已经滚到解读面板」之后才吸底，
+  // 否则页面还停在命盘时，输入框会浮在命盘上方
+  const [pinInput, setPinInput] = useState(false);
+  // 切换话题 / 宫位时把新内容从顶部开始读，递增这个值触发一次回顶
+  const [resetSignal, setResetSignal] = useState(0);
+  // 替换内容后先记下「还没把人带到开头」，等第一批文字到了再校正一次位置：
+  // 内容清空的一瞬间页面会塌缩，那一刻滚不到位
+  const pinTopRef = useRef(false);
 
   // Keep refs in sync
   useEffect(() => { messagesRef.current = messages; }, [messages]);
   useEffect(() => { loadingRef.current = loading; }, [loading]);
 
+  // 把面板开头带到视口里（顶栏 48 + 余量 8）；桌面则回到面板自身滚动条顶部
+  // settle：内容刚清空时页面会变短、一时滚不到位，给一段时间跟着内容长高反复校正，
+  //         手指一动就立刻停手，不去和用户抢滚动
+  const scrollToPanelStart = (smooth: boolean, settle = 0) => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const isMobile = window.matchMedia('(max-width: 1023px)').matches;
+    if (!isMobile) {
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
+      return;
+    }
+    const target = () => Math.max(0, panel.getBoundingClientRect().top + window.scrollY - 56);
+    window.scrollTo({ top: target(), behavior: smooth ? 'smooth' : 'auto' });
+    if (settle <= 0) return;
+
+    let cancelled = false;
+    const stop = () => { cancelled = true; };
+    window.addEventListener('wheel', stop, { passive: true, once: true });
+    window.addEventListener('touchstart', stop, { passive: true, once: true });
+    const until = performance.now() + settle;
+    const step = () => {
+      if (cancelled) return;
+      if (performance.now() > until) { stop(); return; }
+      const t = target();
+      if (Math.abs(t - window.scrollY) > 2) window.scrollTo({ top: t, behavior: 'auto' });
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+
   // Auto-scroll
+  //
+  // 桌面：面板自身是固定高度的滚动容器，跟着最新内容走。
+  // 手机：面板不设内部滚动（长文让整页滚动更好读），所以只在「新开一段解读」时
+  // 把面板顶部带到视野里，流式过程不再跟着跳，避免和手指抢滚动。
   useEffect(() => {
+    const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches;
+    if (isMobile) {
+      const last = messages[messages.length - 1];
+      if (last?.role === 'assistant' && last.content === '') scrollToPanelStart(true);
+      return;
+    }
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // 切换话题后回到这块内容的开头，否则人要往下拉才看得到新解读
+  useEffect(() => {
+    if (!resetSignal) return;
+    scrollToPanelStart(false);
+  }, [resetSignal]);
+
+  // 正文第一批字到了：页面这时才够长，补一次回顶，确保读到的是标题而不是中段
+  useEffect(() => {
+    if (!pinTopRef.current) return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'assistant' || !last.content) return;
+    pinTopRef.current = false;
+    scrollToPanelStart(true, 3000);
+  }, [messages]);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const el = panelRef.current;
+      if (!el) return;
+      setPinInput(el.getBoundingClientRect().top < window.innerHeight * 0.5);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Auto-generate 命格总览 on mount
   useEffect(() => {
@@ -239,7 +278,8 @@ ${selectedPalace.name}在命盘中的意义，以及这种星曜配置的整体�
 **【实际建议】**
 基于此宫的具体建议。`;
 
-    sendMessage(prompt, true);
+    setActiveTopic(''); // 宫位解读不是任何一个话题，别让话题按钮亮着迷惑人
+    sendMessage(prompt, true, true);
   }, [selectedPalace]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 注入四化飞化分析
@@ -273,15 +313,19 @@ ${selectedSiHua.starName}化${selectedSiHua.siHua}落在【${palaceName}】，�
 **【实际建议】**
 基于此四化的具体可操作建议。`;
 
-    sendMessage(prompt, true);
+    setActiveTopic('');
+    sendMessage(prompt, true, true);
   }, [selectedSiHua]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const streamResponse = async (apiMessages: { role: 'user' | 'assistant'; content: string }[]) => {
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const res = await fetch('/api/interpret', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chart, messages: apiMessages }),
+        signal: controller.signal,
       });
       if (res.status === 404) throw new Error('api-missing');
       if (!res.ok) {
@@ -343,38 +387,58 @@ ${selectedSiHua.starName}化${selectedSiHua.siHua}落在【${palaceName}】，�
         }
       }
     } catch (e) {
+      // 被下一次切换打断：直接丢掉，不算错误
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+      if (e instanceof Error && e.name === 'AbortError') return;
       const missing = e instanceof Error && e.message === 'api-missing';
       const message = missing
         ? 'AI 解读接口未启用。请在 .env.local 里配置 AI_PROVIDER 与对应的 API Key 后重启服务。'
         : (e instanceof Error && e.message) || '解读失败，请稍后重试。';
       setMessages(prev => [...prev, { role: 'assistant', content: message }]);
     } finally {
-      setLoading(false);
-      loadingRef.current = false;
+      // 只有「自己还是最新那次请求」才允许收尾，否则会把新请求的 loading 误清掉
+      if (abortRef.current === controller) {
+        setLoading(false);
+        loadingRef.current = false;
+      }
     }
   };
 
-  const sendMessage = (text: string, hidden = false) => {
-    if (!text.trim() || loadingRef.current) return;
-    loadingRef.current = true;
-    setLoading(true);
+  /**
+   * @param replace true = 换一个解读对象（话题 / 宫位 / 四化），清掉旧内容重新开始；
+   *                false = 在下方追问，保留对话上下文。
+   */
+  const sendMessage = (text: string, hidden = false, replace = false) => {
+    if (!text.trim()) return;
+    if (loadingRef.current) {
+      // 追问时不允许并发；切换时直接把上一段流掐断
+      if (!replace) return;
+      abortRef.current?.abort();
+    }
 
     const userMsg: Message = { role: 'user', content: text, hidden };
-    // Capture current messages synchronously via ref (avoids stale closure)
-    const apiMessages = [...messagesRef.current, userMsg].map(m => ({
+    const base = replace ? [] : messagesRef.current;
+    const apiMessages = [...base, userMsg].map(m => ({
       role: m.role,
       content: m.content,
     }));
 
-    setMessages(prev => [...prev, userMsg]);
+    messagesRef.current = [...base, userMsg];
+    loadingRef.current = true;
+    setLoading(true);
+    setMessages(messagesRef.current);
     setInput('');
+    if (replace) {
+      pinTopRef.current = true;
+      setResetSignal(n => n + 1);
+    }
     streamResponse(apiMessages);
   };
 
   const handleTopicClick = (topicKey: string) => {
-    if (loadingRef.current) return;
+    if (!loadingRef.current && topicKey === activeTopic) return;
     setActiveTopic(topicKey);
-    sendMessage(TOPIC_PROMPTS[topicKey], true);
+    sendMessage(TOPIC_PROMPTS[topicKey], true, true);
   };
 
   const handleSend = () => {
@@ -382,23 +446,30 @@ ${selectedSiHua.starName}化${selectedSiHua.siHua}落在【${palaceName}】，�
   };
 
   return (
-    <div className="flex flex-col h-full rounded-xl overflow-hidden card-glass">
+    <div
+      ref={panelRef}
+      data-insight-panel
+      className="insight-panel on-cream flex flex-col px-3 pt-4 pb-2 lg:px-0 lg:pt-0 lg:pb-0 lg:h-full lg:overflow-hidden"
+    >
 
-      {/* ── Topic buttons ── */}
-      <div className="flex-shrink-0 px-2 pt-2.5 pb-2" style={{ borderBottom: '1px solid var(--t-border)' }}>
-        <div className="grid grid-cols-6 gap-1">
+      {/* ── Topic buttons（手机端吸顶，滚到正文里也能直接切） ── */}
+      <div className="insight-topics flex-shrink-0">
+        <div className="insight-topics-scroll">
           {TOPICS.map(t => {
             const isActive = activeTopic === t.key;
             return (
               <button
                 key={t.key}
                 onClick={() => handleTopicClick(t.key)}
-                disabled={loading}
-                className="py-1.5 text-[10px] font-medium rounded-lg transition-all duration-150 disabled:opacity-40"
+                aria-pressed={isActive}
+                className="w-full py-2 text-[12px] font-medium rounded-full transition-all duration-150 lg:py-1.5 lg:text-[10px]"
                 style={{
-                  background: isActive ? 'rgba(212,168,67,0.12)' : 'transparent',
-                  border: `1px solid ${isActive ? 'rgba(212,168,67,0.3)' : 'var(--t-border)'}`,
-                  color: isActive ? 'var(--t-gold)' : 'var(--t-faint)',
+                  background: isActive
+                    ? 'linear-gradient(135deg, var(--violet) 0%, var(--violet-2) 100%)'
+                    : 'rgba(255,255,255,0.9)',
+                  border: `1px solid ${isActive ? 'rgba(255,255,255,0.16)' : 'var(--bdr)'}`,
+                  color: isActive ? '#fff' : 'var(--tx-2)',
+                  boxShadow: isActive ? '0 4px 14px rgba(112,80,200,0.28)' : 'none',
                 }}
               >
                 {t.label}
@@ -409,15 +480,7 @@ ${selectedSiHua.starName}化${selectedSiHua.siHua}落在【${palaceName}】，�
       </div>
 
       {/* ── Messages ── */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
-
-        {/* Loading state before first message */}
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="text-4xl mb-3" style={{ color: 'var(--t-gold)', opacity: 0.1 }}>✦</div>
-            <p className="text-[10px] animate-pulse" style={{ color: 'var(--t-faint)' }}>命格解读生成中…</p>
-          </div>
-        )}
+      <div ref={scrollRef} className="px-1 pt-4 pb-2 space-y-6 lg:flex-1 lg:overflow-y-auto lg:min-h-0 lg:px-4 lg:py-4 lg:space-y-4">
 
         <AnimatePresence initial={false}>
           {messages.map((msg, i) => {
@@ -432,11 +495,11 @@ ${selectedSiHua.starName}化${selectedSiHua.siHua}落在【${palaceName}】，�
                   className="flex justify-end"
                 >
                   <div
-                    className="max-w-[85%] rounded-xl px-3 py-2 text-[11px]"
+                    className="max-w-[88%] rounded-xl px-3.5 py-2.5 text-[14px] leading-relaxed break-words lg:max-w-[85%] lg:px-3 lg:py-2 lg:text-[11px]"
                     style={{
-                      background: 'rgba(212,168,67,0.08)',
-                      border: '1px solid rgba(212,168,67,0.18)',
-                      color: 'var(--t-gold)',
+                      background: 'var(--ac-bg)',
+                      border: '1px solid var(--ac-bdr)',
+                      color: 'var(--ac)',
                     }}
                   >
                     {msg.content}
@@ -447,6 +510,8 @@ ${selectedSiHua.starName}化${selectedSiHua.siHua}落在【${palaceName}】，�
 
             // Assistant message
             const isLastMsg = i === messages.length - 1;
+            // 首字还没到：整条先不渲染，交给下面的「正在解盘」占位
+            if (!msg.content && isLastMsg && loading) return null;
             return (
               <motion.div
                 key={i}
@@ -454,10 +519,10 @@ ${selectedSiHua.starName}化${selectedSiHua.siHua}落在【${palaceName}】，�
                 animate={{ opacity: 1, y: 0 }}
               >
                 <div
-                  className="text-[9px] tracking-widest mb-2 flex items-center gap-1.5"
-                  style={{ color: 'var(--t-faint)' }}
+                  className="text-[10px] tracking-widest mb-2.5 flex items-center gap-1.5 lg:mb-2 lg:text-[9px]"
+                  style={{ color: 'var(--tx-3)' }}
                 >
-                  <span style={{ color: 'var(--t-gold)', opacity: 0.4 }}>✦</span>
+                  <span style={{ color: 'var(--ac)', opacity: 0.5 }}>✦</span>
                   命理解读
                 </div>
                 <AiContent text={msg.content} streaming={loading && isLastMsg} />
@@ -466,10 +531,29 @@ ${selectedSiHua.starName}化${selectedSiHua.siHua}落在【${palaceName}】，�
             );
           })}
         </AnimatePresence>
+
+        {/* 首字未到：给个占位，既让人知道在算，也避免面板瞬间塌掉、
+            把滚动位置甩到中段 */}
+        {loading && !(messages[messages.length - 1]?.role === 'assistant' && messages[messages.length - 1]?.content) && (
+          <div className="flex flex-col items-center justify-center text-center min-h-[46vh] lg:min-h-0 lg:py-16">
+            <div className="text-3xl mb-3 animate-pulse" style={{ color: 'var(--ac)', opacity: 0.55 }}>✦</div>
+            <p className="text-[13px] lg:text-[10px]" style={{ color: 'var(--tx-3)' }}>正在解盘…</p>
+            <p className="text-[11px] mt-1.5 lg:text-[9px]" style={{ color: 'var(--tx-3)', opacity: 0.85 }}>
+              模型先推演盘面，通常十几秒
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ── Input ── */}
-      <div className="flex-shrink-0 px-3 pb-3 pt-2" style={{ borderTop: '1px solid var(--t-border)' }}>
+      <div
+        className={`${pinInput ? 'sticky z-20 backdrop-blur-md rounded-2xl' : 'relative'} flex-shrink-0 px-1 pb-3 pt-2.5 lg:static lg:backdrop-blur-none lg:rounded-none lg:pt-2 lg:px-3`}
+        style={{
+          bottom: pinInput ? 'calc(70px + env(safe-area-inset-bottom))' : undefined,
+          borderTop: '1px solid var(--bdr)',
+          background: 'rgba(255,253,248,0.96)',
+        }}
+      >
         <div className="flex gap-2">
           <input
             type="text"
@@ -478,21 +562,21 @@ ${selectedSiHua.starName}化${selectedSiHua.siHua}落在【${palaceName}】，�
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
             placeholder="继续追问，如：今年适合换工作吗？"
             disabled={loading}
-            className="flex-1 rounded-lg px-3 py-2 text-[11px] focus:outline-none transition-colors"
+            className="flex-1 rounded-full px-4 py-2.5 text-[16px] focus:outline-none transition-colors lg:py-2 lg:text-[11px]"
             style={{
-              background: 'var(--t-card)',
-              border: '1px solid var(--t-border)',
-              color: 'var(--t-text)',
+              background: '#FFFFFF',
+              border: '1px solid var(--bdr-med)',
+              color: 'var(--tx-0)',
             }}
           />
           <button
             onClick={handleSend}
             disabled={loading || !input.trim()}
-            className="px-3 py-2 rounded-lg text-[11px] font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            className="px-5 py-2.5 rounded-full text-[14px] font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed lg:px-3 lg:py-2 lg:text-[11px] text-white"
             style={{
-              background: 'rgba(212,168,67,0.15)',
-              border: '1px solid rgba(212,168,67,0.25)',
-              color: 'var(--t-gold)',
+              background: 'linear-gradient(135deg, var(--violet) 0%, var(--violet-2) 100%)',
+              border: '1px solid rgba(255,255,255,0.16)',
+              boxShadow: '0 4px 14px rgba(112,80,200,0.26)',
             }}
           >
             {loading ? '…' : '追问'}

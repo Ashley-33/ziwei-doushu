@@ -7,46 +7,7 @@ import { generateChart as buildChart } from '@/lib/ziwei/algorithm';
 import type { BirthInfo, ZiweiChart } from '@/lib/ziwei/types';
 import { useTheme } from '@/components/ThemeProvider';
 import CopyPrompt, { promptOnlyMessage } from '@/components/CopyPrompt';
-
-// ─── AiContent 渲染器（与 InsightPanel 一致）────────────────
-function AiContent({ text, streaming }: { text: string; streaming?: boolean }) {
-  const lines = text.split('\n');
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      {lines.map((line, i) => {
-        const sectionMatch = line.match(/^\*\*【(.+?)】\*\*$/);
-        if (sectionMatch) {
-          return (
-            <div key={i} style={{ paddingTop: i === 0 ? 0 : '14px', paddingBottom: '4px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--ac)', letterSpacing: '0.04em' }}>
-                【{sectionMatch[1]}】
-              </span>
-            </div>
-          );
-        }
-        if (line.trim() === '') return <div key={i} style={{ height: '4px' }} />;
-        const parts = line.split(/\*\*(.+?)\*\*/);
-        return (
-          <div key={i} style={{ fontSize: '13px', lineHeight: 1.75, color: 'var(--tx-2)' }}>
-            {parts.map((part, j) =>
-              j % 2 === 0
-                ? part
-                : <strong key={j} style={{ fontWeight: 500, color: 'var(--tx-0)' }}>{part}</strong>
-            )}
-          </div>
-        );
-      })}
-      {streaming && (
-        <span style={{
-          display: 'inline-block', width: '7px', height: '13px',
-          background: 'var(--ac)', opacity: 0.5, borderRadius: '2px',
-          animation: 'pulse 1s ease-in-out infinite',
-          verticalAlign: 'middle', marginLeft: '2px',
-        }} />
-      )}
-    </div>
-  );
-}
+import AiContent from '@/components/AiContent';
 
 export default function HemingPage() {
   const router = useRouter();
@@ -178,23 +139,29 @@ export default function HemingPage() {
   }, [formA, formB, generateChart]);
 
   const cardStyle = {
-    background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.9)',
-    border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(200,160,60,0.2)'}`,
-    borderRadius: '16px',
-    padding: '24px',
+    background: isDark
+      ? 'linear-gradient(160deg, rgba(255,255,255,0.085), rgba(255,255,255,0.035))'
+      : 'rgba(255,255,255,0.9)',
+    border: '1px solid rgba(232,205,147,0.22)',
+    borderRadius: '20px',
+    padding: 'clamp(16px, 4.5vw, 24px)',
+    boxShadow: '0 10px 30px rgba(50,36,104,0.20)',
   };
 
+  // 双方表单本身已经是奶油卡片，外层不再套一层
+  const formCardStyle = { padding: 0, background: 'transparent', border: 'none' };
+
   const labelStyle = {
-    fontSize: '10px', letterSpacing: '0.4em', color: 'var(--ac)', opacity: 0.7,
+    fontSize: '10px', letterSpacing: '0.4em', color: 'var(--ac)', opacity: 0.9,
     marginBottom: '16px', display: 'block',
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-0)' }}>
+    <div style={{ minHeight: '100vh', background: 'transparent' }}>
       {/* 顶栏 */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 50,
-        background: isDark ? 'rgba(2,8,16,0.88)' : 'rgba(250,245,235,0.92)',
+        background: isDark ? 'rgba(80,69,140,0.94)' : 'rgba(250,245,235,0.92)',
         backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
         borderBottom: '1px solid var(--bdr)',
         display: 'flex', alignItems: 'center', padding: '0 24px', height: '52px', gap: '16px',
@@ -212,16 +179,16 @@ export default function HemingPage() {
         <div style={{ width: '1px', height: '20px', background: 'var(--bdr-med)' }} />
         <span style={{ fontSize: '12px', color: 'var(--ac)', letterSpacing: '0.2em' }}>合盘分析</span>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: '11px', color: 'var(--tx-3)' }}>感情 · 合伙 · 亲子 · 朋友</span>
+        <span style={{ fontSize: '11px', color: 'var(--tx-2)' }}>感情 · 合伙 · 亲子 · 朋友</span>
       </header>
 
       {/* 主体 */}
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px 80px' }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: 'clamp(20px, 5vw, 32px) clamp(14px, 4vw, 24px) 64px' }}>
 
         {/* 标题 */}
-        <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-          <div style={{ fontSize: '28px', color: 'var(--ac)', opacity: 0.15, marginBottom: '12px' }}>☯</div>
-          <h1 style={{ fontSize: '22px', fontWeight: 600, letterSpacing: '0.15em', color: 'var(--tx-0)', marginBottom: '8px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 'clamp(22px, 5vw, 36px)' }}>
+          <div style={{ fontSize: '26px', color: 'var(--ac)', opacity: 0.22, marginBottom: '10px' }}>☯</div>
+          <h1 className="grad-text grad-text-gold" style={{ fontSize: '26px', fontWeight: 700, letterSpacing: '0.14em', marginBottom: '8px', fontFamily: "'Songti SC','Noto Serif SC',serif" }}>
             紫微合盘
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--tx-3)', lineHeight: 1.6 }}>
@@ -233,7 +200,7 @@ export default function HemingPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}
           className="heming-grid">
           {/* 甲方 */}
-          <div style={cardStyle}>
+          <div style={formCardStyle}>
             <span style={labelStyle}>甲方 — A</span>
             <BirthForm
               hideSubmit
@@ -243,7 +210,7 @@ export default function HemingPage() {
           </div>
 
           {/* 乙方 */}
-          <div style={cardStyle}>
+          <div style={formCardStyle}>
             <span style={labelStyle}>乙方 — B</span>
             <BirthForm
               hideSubmit
@@ -257,7 +224,7 @@ export default function HemingPage() {
         <div ref={analysisRef} style={{
           ...cardStyle,
           minHeight: '320px',
-          padding: '32px',
+          padding: 'clamp(18px, 5vw, 32px)',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: (!analysis && !analyzing) ? 'center' : 'flex-start',
@@ -278,11 +245,12 @@ export default function HemingPage() {
               <button
                 onClick={() => runAnalysis()}
                 style={{
-                  padding: '14px 40px', borderRadius: 'var(--r-pill)', border: 'none',
-                  background: 'linear-gradient(135deg, #9a6210, #c88020)',
-                  color: '#fff8e8', fontSize: '14px', fontWeight: 600,
+                  padding: '14px 40px', borderRadius: 'var(--r-pill)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  background: 'linear-gradient(135deg, var(--violet) 0%, var(--violet-2) 100%)',
+                  color: '#fff', fontSize: '14px', fontWeight: 600,
                   letterSpacing: '0.15em', cursor: 'pointer',
-                  boxShadow: '0 4px 16px rgba(140,100,20,0.25)',
+                  boxShadow: '0 10px 26px rgba(84,56,168,0.34)',
                   transition: 'transform 0.15s',
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; }}
@@ -378,8 +346,8 @@ export default function HemingPage() {
                 onClick={() => runAnalysis(question || undefined)}
                 disabled={analyzing}
                 style={{
-                  padding: '10px 20px', borderRadius: 'var(--r-sm)', border: 'none',
-                  background: analyzing ? 'var(--bg-2)' : 'var(--tx-0)',
+                  padding: '10px 20px', borderRadius: 'var(--r-pill)', border: 'none',
+                  background: analyzing ? 'var(--bg-2)' : 'linear-gradient(135deg, var(--violet), var(--violet-2))',
                   color: analyzing ? 'var(--tx-3)' : 'white',
                   fontSize: '13px', fontWeight: 500,
                   cursor: analyzing ? 'not-allowed' : 'pointer',
@@ -394,8 +362,12 @@ export default function HemingPage() {
       </div>
 
       <style>{`
-        @media (max-width: 680px) {
+        @media (max-width: 900px) {
           .heming-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 767px) {
+          header { padding: 0 14px !important; gap: 10px !important; }
+          h1 { font-size: 20px !important; }
         }
       `}</style>
     </div>

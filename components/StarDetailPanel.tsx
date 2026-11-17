@@ -163,17 +163,17 @@ const STAR_DETAIL: Record<string, {
 };
 
 const levelConfig = {
-  major: { label: '主星', color: 'text-amber-400 border-amber-500/30 bg-amber-500/10' },
-  lucky: { label: '吉星', color: 'text-sky-400 border-sky-500/30 bg-sky-500/10' },
-  sha:   { label: '煞星', color: 'text-red-400 border-red-500/30 bg-red-500/10' },
-  minor: { label: '杂星', color: 'text-slate-400 border-slate-500/25 bg-slate-500/10' },
+  major: { label: '主星', color: 'text-amber-700 border-amber-600/35 bg-amber-500/10' },
+  lucky: { label: '吉星', color: 'text-sky-700 border-sky-600/35 bg-sky-500/10' },
+  sha:   { label: '煞星', color: 'text-red-700 border-red-600/35 bg-red-500/10' },
+  minor: { label: '杂星', color: 'text-slate-600 border-slate-500/30 bg-slate-500/10' },
 };
 
 const siHuaColors: Record<string, string> = {
-  '禄': 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
-  '权': 'text-blue-400 bg-blue-500/10 border-blue-500/30',
-  '科': 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
-  '忌': 'text-red-400 bg-red-500/10 border-red-500/30',
+  '禄': 'text-emerald-700 bg-emerald-500/10 border-emerald-600/35',
+  '权': 'text-blue-700 bg-blue-500/10 border-blue-600/35',
+  '科': 'text-yellow-700 bg-yellow-500/10 border-yellow-600/35',
+  '忌': 'text-red-700 bg-red-500/10 border-red-600/35',
 };
 
 export default function StarDetailPanel({ star, palaceName, onClose }: StarDetailPanelProps) {
@@ -222,7 +222,7 @@ export default function StarDetailPanel({ star, palaceName, onClose }: StarDetai
                   <div key={tag} className="text-[10px] px-2 py-1 rounded-full"
                     style={{
                       border: '1px solid var(--t-border)',
-                      color: tag.includes('庙旺') ? '#eab308' : tag.includes('落陷') ? '#ef4444' : 'var(--t-text2)',
+                      color: tag.includes('庙旺') ? '#9A6B05' : tag.includes('落陷') ? '#C0392B' : 'var(--t-text2)',
                     }}>
                     {tag}
                   </div>
@@ -237,7 +237,7 @@ export default function StarDetailPanel({ star, palaceName, onClose }: StarDetai
                 <div className="flex flex-wrap gap-1.5">
                   {desc.keywords.split('·').map(k => (
                     <span key={k} className="text-[11px] px-2 py-0.5 rounded-full"
-                      style={{ color: 'var(--t-gold)', border: '1px solid rgba(212,168,67,0.2)', background: 'rgba(212,168,67,0.06)' }}>
+                      style={{ color: 'var(--t-gold)', border: '1px solid rgba(150,112,15,0.22)', background: 'rgba(150,112,15,0.07)' }}>
                       {k.trim()}
                     </span>
                   ))}
@@ -247,7 +247,7 @@ export default function StarDetailPanel({ star, palaceName, onClose }: StarDetai
 
             {/* 古书原文 */}
             {detail && (
-              <div className="rounded-xl p-3" style={{ background: 'rgba(212,168,67,0.04)', border: '1px solid rgba(212,168,67,0.12)' }}>
+              <div className="rounded-xl p-3" style={{ background: 'rgba(150,112,15,0.06)', border: '1px solid rgba(150,112,15,0.16)' }}>
                 <div className="text-[10px] tracking-widest mb-1.5 flex items-center gap-1" style={{ color: 'var(--t-gold)', opacity: 0.7 }}>
                   古书原文
                 </div>
@@ -285,7 +285,7 @@ export default function StarDetailPanel({ star, palaceName, onClose }: StarDetai
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="text-[10px] p-2.5 rounded-lg" style={{ border: '1px solid rgba(74,222,128,0.15)', background: 'rgba(74,222,128,0.05)' }}>
+                  <div className="text-[10px] p-2.5 rounded-lg" style={{ border: '1px solid rgba(20,114,74,0.20)', background: 'rgba(20,114,74,0.06)' }}>
                     <div className="text-emerald-500 mb-0.5 font-medium">最佳宫位</div>
                     <div className="text-emerald-500/70">{detail.bestPalace}</div>
                   </div>

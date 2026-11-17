@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ZiweiChart } from '@/lib/ziwei/types';
 import CopyPrompt, { promptOnlyMessage } from './CopyPrompt';
+import AiContent from './AiContent';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -28,12 +29,26 @@ export default function ChatPanel({ chart }: ChatPanelProps) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pinInput, setPinInput] = useState(false);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // 手机上，只有面板已滚入视野时输入条才吸底
+  useEffect(() => {
+    const onScroll = () => {
+      const el = panelRef.current;
+      if (!el) return;
+      setPinInput(el.getBoundingClientRect().top < window.innerHeight * 0.5);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return;
@@ -121,19 +136,23 @@ export default function ChatPanel({ chart }: ChatPanelProps) {
   };
 
   return (
-    <div className="flex flex-col h-full rounded-xl overflow-hidden card-glass">
+    <div
+      ref={panelRef}
+      className="flex flex-col rounded-xl lg:h-full lg:overflow-hidden"
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--bdr)' }}
+    >
       {/* 标题 */}
-      <div className="px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--t-border)' }}>
-        <h3 className="text-xs font-medium tracking-widest" style={{ color: 'var(--t-gold)' }}>AI 命盘解读</h3>
-        <p className="text-[10px] mt-0.5" style={{ color: 'var(--t-faint)' }}>倪海厦正宗紫微斗数 · 智慧解析</p>
+      <div className="px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--bdr)' }}>
+        <h3 className="text-[13px] font-medium tracking-widest lg:text-xs" style={{ color: 'var(--ac)' }}>AI 命盘解读</h3>
+        <p className="text-[11px] mt-0.5 lg:text-[10px]" style={{ color: 'var(--tx-3)' }}>倪海厦正宗紫微斗数 · 智慧解析</p>
       </div>
 
       {/* 消息列表 */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+      <div ref={scrollRef} className="px-4 py-4 space-y-3.5 lg:flex-1 lg:overflow-y-auto lg:min-h-0 lg:space-y-3">
         {messages.length === 0 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8">
-            <div className="text-4xl mb-3" style={{ color: 'var(--t-gold)', opacity: 0.15 }}>✦</div>
-            <p className="text-xs leading-relaxed" style={{ color: 'var(--t-faint)' }}>
+            <div className="text-4xl mb-3" style={{ color: 'var(--ac)', opacity: 0.35 }}>✦</div>
+            <p className="text-[13px] leading-relaxed lg:text-xs" style={{ color: 'var(--tx-3)' }}>
               命盘已生成，可直接提问<br />
               或从下方选择常见问题开始解读
             </p>
@@ -149,26 +168,28 @@ export default function ChatPanel({ chart }: ChatPanelProps) {
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className="max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed"
+                className={msg.role === 'user'
+                  ? 'max-w-[88%] rounded-xl px-3.5 py-2.5 text-[14.5px] leading-relaxed break-words lg:max-w-[85%] lg:text-sm'
+                  : 'w-full min-w-0 break-words'}
                 style={msg.role === 'user' ? {
-                  background: 'rgba(212,168,67,0.1)',
-                  border: '1px solid rgba(212,168,67,0.2)',
-                  color: 'var(--t-gold)',
-                } : {
-                  background: 'var(--t-card)',
-                  border: '1px solid var(--t-border)',
-                  color: 'var(--t-text)',
-                }}
+                  background: 'var(--ac-bg)',
+                  border: '1px solid var(--ac-bdr)',
+                  color: 'var(--ac)',
+                } : undefined}
               >
                 {msg.role === 'assistant' && (
-                  <div className="text-[10px] mb-1" style={{ color: 'var(--t-faint)' }}>命理师 ·</div>
+                  <div className="text-[10px] mb-2 flex items-center gap-1.5" style={{ color: 'var(--tx-3)' }}>
+                    <span style={{ color: 'var(--ac)', opacity: 0.5 }}>✦</span>命理师
+                  </div>
                 )}
-                <div className="whitespace-pre-wrap text-xs leading-relaxed">
-                  {msg.content}
-                  {loading && i === messages.length - 1 && msg.role === 'assistant' && (
-                    <span className="inline-block w-1.5 h-3 ml-0.5 animate-pulse" style={{ background: 'var(--t-gold)', opacity: 0.6 }} />
-                  )}
-                </div>
+                {msg.role === 'assistant' ? (
+                  <AiContent
+                    text={msg.content}
+                    streaming={loading && i === messages.length - 1}
+                  />
+                ) : (
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                )}
                 {msg.copyText && <CopyPrompt text={msg.copyText} />}
               </div>
             </motion.div>
@@ -185,7 +206,7 @@ export default function ChatPanel({ chart }: ChatPanelProps) {
                 key={i}
                 onClick={() => sendMessage(q)}
                 disabled={loading}
-                className="text-left text-[10px] rounded-lg px-2.5 py-2 transition-all line-clamp-2"
+                className="text-left text-[12.5px] rounded-lg px-3 py-2.5 transition-all line-clamp-2 lg:text-[10px] lg:px-2.5 lg:py-2"
                 style={{
                   color: 'var(--t-text2)',
                   border: '1px solid var(--t-border)',
@@ -208,7 +229,10 @@ export default function ChatPanel({ chart }: ChatPanelProps) {
       )}
 
       {/* 输入框 */}
-      <div className="px-3 pb-3 pt-2 flex-shrink-0" style={{ borderTop: '1px solid var(--t-border)' }}>
+      <div
+        className={`${pinInput ? 'sticky bottom-0 z-10 backdrop-blur-md' : 'relative'} px-3 pb-3 pt-2.5 flex-shrink-0 rounded-b-xl lg:static lg:backdrop-blur-none lg:rounded-none lg:pt-2`}
+        style={{ borderTop: '1px solid var(--bdr)', background: 'color-mix(in srgb, var(--bg-card) 96%, transparent)' }}
+      >
         <div className="flex gap-2">
           <input
             type="text"
@@ -217,11 +241,11 @@ export default function ChatPanel({ chart }: ChatPanelProps) {
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage(input)}
             placeholder="输入问题，如：我的感情运势如何？"
             disabled={loading}
-            className="flex-1 rounded-lg px-3 py-2 text-xs focus:outline-none transition-colors"
+            className="flex-1 rounded-lg px-3 py-2.5 text-[16px] focus:outline-none transition-colors lg:py-2 lg:text-xs"
             style={{
-              background: 'var(--t-card)',
-              border: '1px solid var(--t-border)',
-              color: 'var(--t-text)',
+              background: 'var(--bg-1)',
+              border: '1px solid var(--bdr-med)',
+              color: 'var(--tx-0)',
             }}
           />
           <button

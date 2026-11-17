@@ -17,10 +17,10 @@ export default function KnowledgeHomePage() {
   const STAR_DESCRIPTIONS_QUICK = STAR_BRIEF_SEO;
 
   return (
-    <div style={{ background: 'var(--bg-page)', minHeight: '100vh' }}>
+    <div style={{ minHeight: '100vh' }}>
       {/* 顶栏 */}
       <div className="px-6 py-4 flex items-center justify-between"
-        style={{ borderBottom: '1px solid rgba(184,146,42,0.15)', background: 'var(--bg-page)' }}>
+        style={{ borderBottom: '1px solid var(--bdr)', background: 'var(--nav-grad)', backdropFilter: 'blur(10px)' }}>
         <Link href="/" style={{ fontSize: '12px', color: 'var(--ac)', letterSpacing: '0.3em', textDecoration: 'none' }}>
           ← 首页
         </Link>
@@ -39,7 +39,7 @@ export default function KnowledgeHomePage() {
           <span style={{ fontSize: '11px', color: 'var(--ac)', letterSpacing: '0.4em' }}>KNOWLEDGE BASE</span>
           <div style={{ height: '1px', width: '48px', background: 'linear-gradient(to left, transparent, rgba(184,146,42,0.4))' }} />
         </div>
-        <h1 style={{ fontSize: 'clamp(28px, 4vw, 42px)', fontWeight: 700, color: 'var(--tx-0)', letterSpacing: '0.15em', marginBottom: '12px' }}>
+        <h1 className="grad-text grad-text-gold" style={{ fontSize: 'clamp(26px, 6vw, 40px)', fontWeight: 700, letterSpacing: '0.14em', marginBottom: '12px', fontFamily: "'Songti SC','Noto Serif SC',serif" }}>
           紫微斗数知识库
         </h1>
         <p style={{ fontSize: '14px', color: 'var(--tx-2)', letterSpacing: '0.08em', maxWidth: '600px', margin: '0 auto', lineHeight: 1.7 }}>
@@ -60,17 +60,18 @@ export default function KnowledgeHomePage() {
               href={`/knowledge/${STAR_TO_SLUG[star]}/overview`}
               style={{
                 display: 'block',
-                padding: '14px 10px',
-                background: 'var(--bg-card)',
-                border: '1px solid rgba(184,146,42,0.2)',
-                borderRadius: '10px',
+                padding: '18px 10px',
+                background: 'linear-gradient(165deg, #FFFDF8 0%, #F8EFDC 100%)',
+                border: '1px solid rgba(201,164,76,0.30)',
+                borderRadius: '16px',
                 textDecoration: 'none',
                 textAlign: 'center',
+                boxShadow: '0 6px 16px rgba(50,36,104,0.16)',
                 transition: 'all 0.2s',
               }}
-              className="hover:shadow-md hover:border-amber-400"
+              className="on-cream hover:shadow-md hover:border-amber-400"
             >
-              <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--tx-0)', letterSpacing: '0.15em' }}>
+              <div style={{ fontSize: '17px', fontWeight: 700, color: 'var(--ac)', letterSpacing: '0.15em', fontFamily: "'Songti SC','Noto Serif SC',serif" }}>
                 {star}
               </div>
             </Link>
@@ -80,12 +81,7 @@ export default function KnowledgeHomePage() {
         {/* 详细列表（每个主星 + 简介 + 进入按钮） */}
         <div className="mt-14 space-y-4">
           {ALL_STARS.map(star => (
-            <div key={star} style={{
-              background: 'var(--bg-card)',
-              border: '1px solid rgba(184,146,42,0.18)',
-              borderRadius: '12px',
-              padding: '18px 22px',
-            }}>
+            <div key={star} className="card-glass" style={{ padding: '18px 22px' }}>
               <div className="flex items-baseline gap-3 mb-2">
                 <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--tx-0)', letterSpacing: '0.1em' }}>
                   {star}星
@@ -108,8 +104,8 @@ export default function KnowledgeHomePage() {
                       style={{
                         fontSize: '11px',
                         padding: '4px 10px',
-                        background: 'rgba(184,146,42,0.06)',
-                        border: '1px solid rgba(184,146,42,0.15)',
+                        background: 'var(--ac-bg)',
+                        border: '1px solid var(--ac-bdr)',
                         borderRadius: '999px',
                         color: 'var(--tx-2)',
                         textDecoration: 'none',
